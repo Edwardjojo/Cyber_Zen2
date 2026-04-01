@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyber Zen · 赛博禅</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400&family=Noto+Serif+SC:wght@300;400&family=LXGW+WenKai:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- WebGL fullscreen background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Mode switcher – visible only when hovering top 50px -->
+  <div id="mode-bar">
+    <span class="mode-option active" data-mode="rain">Rain</span>
+    <span class="mode-sep">/</span>
+    <span class="mode-option" data-mode="snow">Star</span>
+  </div>
+
+  <!-- The Deck – immersive editor -->
+  <div id="deck">
+    <textarea id="editor" placeholder="在此书写 …" spellcheck="false"></textarea>
+    <div id="deck-toolbar">
+      <button id="btn-font" title="切换字体">A</button>
+      <button id="btn-timer" title="心流计时器">⏱</button>
+      <button id="btn-export" title="导出 .txt">↓</button>
+    </div>
+  </div>
+
+  <!-- Vibe Mixer toggle (bottom-right) -->
+  <div id="mixer-toggle" title="Vibe Mixer">
+    <svg width="26" height="26" viewBox="0 0 20 20" fill="none">
+      <rect x="3" y="4" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+      <rect x="3" y="9.25" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+      <rect x="3" y="14.5" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+      <circle cx="7" cy="4.75" r="2" fill="currentColor"/>
+      <circle cx="13" cy="10" r="2" fill="currentColor"/>
+      <circle cx="9" cy="15.25" r="2" fill="currentColor"/>
+    </svg>
+  </div>
+
+  <!-- Vibe Mixer panel -->
+  <div id="vibe-mixer">
+    <h3>Vibe Mixer</h3>
+    <label>
+      <span class="label-text">Intensity</span>
+      <input type="range" id="sl-intensity" min="0" max="100" value="50">
+    </label>
+    <label>
+      <span class="label-text">Blur</span>
+      <input type="range" id="sl-blur" min="0" max="100" value="20">
+    </label>
+    <label>
+      <span class="label-text">White Noise</span>
+      <input type="range" id="sl-noise" min="0" max="100" value="0">
+    </label>
+    <label>
+      <span class="label-text">Ambient</span>
+      <input type="range" id="sl-music" min="0" max="100" value="0">
+    </label>
+  </div>
+
+  <!-- Zen Timer overlay -->
+  <div id="zen-timer" class="hidden">
+    <svg id="timer-ring" viewBox="0 0 120 120">
+      <circle class="ring-bg" cx="60" cy="60" r="54"/>
+      <circle class="ring-fg" cx="60" cy="60" r="54"/>
+    </svg>
+    <div id="timer-display">25:00</div>
+    <div id="timer-controls">
+      <button id="timer-start">▶</button>
+      <button id="timer-reset">↻</button>
+    </div>
+    <div id="timer-presets">
+      <span data-min="15">15</span>
+      <span data-min="25" class="active">25</span>
+      <span data-min="45">45</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

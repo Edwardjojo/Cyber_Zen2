@@ -1,0 +1,363 @@
+/* =========================================================
+   Cyber Zen · 赛博禅  —  Visual Stylesheet
+   ========================================================= */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --glass-bg: rgba(10, 12, 18, 0.35);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: 18px;
+  --text-color: rgba(220, 225, 235, 0.88);
+  --text-dim: rgba(180, 190, 210, 0.4);
+  --accent: rgba(100, 180, 255, 0.6);
+  --font-1: 'LXGW WenKai', cursive;
+  --font-2: 'Noto Serif SC', serif;
+  --font-3: 'JetBrains Mono', monospace;
+  --ui-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #050608;
+  font-family: var(--font-1);
+  color: var(--text-color);
+  cursor: default;
+  user-select: none;
+}
+
+/* ---- WebGL Canvas ---- */
+#bg-canvas {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+}
+
+/* ---- Mode Switcher (top bar) ---- */
+#mode-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.5s var(--ui-ease);
+  font-family: var(--font-3);
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+#mode-bar:hover,
+#mode-bar.visible { opacity: 1; }
+
+.mode-option {
+  cursor: pointer;
+  padding: 4px 8px;
+  color: var(--text-dim);
+  transition: color 0.3s, text-shadow 0.3s;
+}
+.mode-option.active {
+  color: var(--text-color);
+  text-shadow: 0 0 12px var(--accent);
+}
+.mode-option:hover { color: var(--text-color); }
+.mode-sep { color: var(--text-dim); }
+
+/* ---- The Deck (Editor) ---- */
+#deck {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  padding: 60px 10%;
+  pointer-events: none;
+}
+
+#editor {
+  width: 100%;
+  max-width: 760px;
+  height: 65vh;
+  resize: none;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 36px 40px;
+  font-family: var(--font-1);
+  font-size: 17px;
+  line-height: 1.9;
+  color: var(--text-color);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  outline: none;
+  pointer-events: auto;
+  user-select: text;
+  opacity: 0.15;
+  transition: opacity 0.6s var(--ui-ease), border-color 0.4s;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+#editor:hover,
+#editor:focus {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+#editor::placeholder {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Toolbar under editor */
+#deck-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  opacity: 0;
+  transition: opacity 0.5s var(--ui-ease);
+  pointer-events: auto;
+}
+#deck:hover #deck-toolbar,
+#editor:focus ~ #deck-toolbar { opacity: 0.85; }
+#deck-toolbar:hover { opacity: 1 !important; }
+
+#deck-toolbar button {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: rgba(210,220,240,0.8);
+  font-family: var(--font-3);
+  font-size: 15px;
+  padding: 10px 22px;
+  cursor: pointer;
+  transition: color 0.3s, background 0.3s, border-color 0.3s, box-shadow 0.3s;
+  backdrop-filter: blur(12px);
+}
+#deck-toolbar button:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.25);
+  box-shadow: 0 0 12px rgba(100,180,255,0.2);
+}
+
+/* ---- Vibe Mixer ---- */
+#mixer-toggle {
+  position: fixed;
+  bottom: 28px; right: 28px;
+  width: 52px; height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(210,220,240,0.8);
+  cursor: pointer;
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.5s var(--ui-ease), color 0.3s, transform 0.3s, box-shadow 0.3s;
+}
+#mixer-toggle:hover {
+  opacity: 1;
+  color: #fff;
+  transform: scale(1.1);
+  box-shadow: 0 0 16px rgba(100,180,255,0.3);
+}
+body:hover #mixer-toggle { opacity: 0.7; }
+
+#vibe-mixer {
+  position: fixed;
+  bottom: 92px; right: 28px;
+  width: 280px;
+  padding: 26px 24px;
+  border-radius: 18px;
+  background: rgba(15, 18, 30, 0.7);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255,255,255,0.12);
+  z-index: 199;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px) scale(0.96);
+  transition: opacity 0.4s var(--ui-ease), transform 0.4s var(--ui-ease);
+}
+#vibe-mixer.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+#vibe-mixer h3 {
+  font-family: var(--font-3);
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(200,210,230,0.7);
+  margin-bottom: 20px;
+}
+
+#vibe-mixer label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+#vibe-mixer label:last-child { margin-bottom: 0; }
+
+.label-text {
+  font-family: var(--font-3);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(200,210,230,0.65);
+}
+
+/* Custom range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  box-shadow: 0 0 8px rgba(100,180,255,0.4);
+  transition: transform 0.2s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+/* ---- Zen Timer ---- */
+#zen-timer {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s var(--ui-ease);
+}
+#zen-timer.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+#zen-timer.hidden { display: none; }
+
+#timer-ring {
+  width: 160px; height: 160px;
+}
+.ring-bg {
+  fill: none;
+  stroke: rgba(255,255,255,0.04);
+  stroke-width: 2;
+}
+.ring-fg {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 339.292;
+  stroke-dashoffset: 0;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset 0.5s linear;
+  filter: drop-shadow(0 0 6px rgba(100,180,255,0.35));
+}
+
+#timer-display {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -70%);
+  font-family: var(--font-3);
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  color: var(--text-color);
+}
+
+#timer-controls {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+#timer-controls button {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.3s, background 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#timer-controls button:hover {
+  color: var(--text-color);
+  background: rgba(255,255,255,0.1);
+}
+
+#timer-presets {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  font-family: var(--font-3);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+#timer-presets span {
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: color 0.3s, text-shadow 0.3s;
+}
+#timer-presets span.active {
+  color: var(--text-color);
+  text-shadow: 0 0 8px var(--accent);
+}
+#timer-presets span:hover { color: var(--text-color); }
+
+/* ---- Font classes ---- */
+.font-wenkai  { font-family: var(--font-1) !important; }
+.font-serif   { font-family: var(--font-2) !important; }
+.font-mono    { font-family: var(--font-3) !important; }
+
+/* ---- Misc ---- */
+::selection {
+  background: rgba(100, 180, 255, 0.25);
+}
+
+/* Scrollbar (Webkit) */
+#editor::-webkit-scrollbar { width: 4px; }
+#editor::-webkit-scrollbar-track { background: transparent; }
+#editor::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+}
