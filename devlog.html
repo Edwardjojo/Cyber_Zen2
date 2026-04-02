@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyber Zen · 开发全记录</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400&family=Noto+Serif+SC:wght@300;400&display=swap');
+
+  :root {
+    --bg: #07080f;
+    --bg2: #0d0f1a;
+    --bg3: #131625;
+    --border: rgba(255,255,255,0.07);
+    --accent: #5ab4ff;
+    --accent2: #a78bfa;
+    --text: rgba(220,228,242,0.9);
+    --text-dim: rgba(180,195,225,0.5);
+    --user-bg: rgba(90,180,255,0.08);
+    --ai-bg: rgba(167,139,250,0.07);
+    --code-bg: rgba(0,0,0,0.4);
+    --radius: 14px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 300;
+    line-height: 1.85;
+    font-size: 15px;
+  }
+
+  /* ── Sidebar TOC ── */
+  #toc {
+    position: fixed;
+    top: 0; left: 0;
+    width: 220px; height: 100vh;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 32px 0;
+    overflow-y: auto;
+    z-index: 100;
+  }
+  #toc h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0 24px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  #toc a {
+    display: block;
+    padding: 7px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color .25s, background .25s, border-left .25s;
+    border-left: 3px solid transparent;
+  }
+  #toc a:hover, #toc a.active {
+    color: var(--accent);
+    background: rgba(90,180,255,0.06);
+    border-left-color: var(--accent);
+  }
+  #toc .toc-step { color: var(--text-dim); font-size: 10px; padding: 3px 24px 3px 34px; }
+
+  /* ── Main ── */
+  main {
+    margin-left: 220px;
+    padding: 0 60px 120px;
+    max-width: 980px;
+  }
+
+  /* ── Hero ── */
+  #hero {
+    padding: 80px 0 60px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 64px;
+  }
+  #hero .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  #hero h1 {
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 1.3;
+    background: linear-gradient(135deg, #e0eaff 0%, var(--accent) 50%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 18px;
+  }
+  #hero p { color: var(--text-dim); font-size: 16px; max-width: 620px; }
+  .meta-row {
+    display: flex; gap: 32px; margin-top: 32px;
+  }
+  .meta-item { display:flex; flex-direction:column; gap:4px; }
+  .meta-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing:2px; text-transform:uppercase; color: var(--text-dim); }
+  .meta-value { font-size: 14px; color: var(--accent); }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 80px;
+    padding-top: 8px;
+  }
+  .step-header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 28px;
+  }
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    background: rgba(90,180,255,0.1);
+    border: 1px solid rgba(90,180,255,0.2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+  .section h2 {
+    font-size: 24px;
+    font-weight: 400;
+    color: #e8eeff;
+  }
+  .section h3 {
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--accent2);
+    margin: 28px 0 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+  }
+  .section p { margin-bottom: 14px; color: var(--text); }
+  .section ul, .section ol { padding-left: 22px; margin-bottom: 14px; }
+  .section li { margin-bottom: 6px; color: var(--text); }
+  .divider { height: 1px; background: var(--border); margin: 48px 0; }
+
+  /* ── Chat bubbles ── */
+  .chat { margin: 24px 0; display: flex; flex-direction: column; gap: 14px; }
+  .bubble { padding: 14px 18px; border-radius: var(--radius); max-width: 88%; line-height:1.7; font-size: 14px; }
+  .bubble.user {
+    background: var(--user-bg);
+    border: 1px solid rgba(90,180,255,0.12);
+    border-bottom-right-radius: 4px;
+    align-self: flex-end;
+    color: rgba(200,220,255,0.85);
+  }
+  .bubble.ai {
+    background: var(--ai-bg);
+    border: 1px solid rgba(167,139,250,0.12);
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+    color: var(--text);
+  }
+  .bubble-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .bubble.user .bubble-label { color: var(--accent); text-align:right; }
+  .bubble.ai   .bubble-label { color: var(--accent2); }
+
+  /* ── Code block ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: rgba(200,220,255,0.8);
+  }
+  pre .kw  { color: #c792ea; }
+  pre .fn  { color: #82aaff; }
+  pre .str { color: #c3e88d; }
+  pre .cmt { color: rgba(180,200,240,0.35); font-style: italic; }
+  pre .num { color: #f78c6c; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--accent);
+  }
+
+  /* ── Screenshot placeholder ── */
+  .screenshot {
+    background: var(--bg3);
+    border: 1px dashed rgba(255,255,255,0.12);
+    border-radius: var(--radius);
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .screenshot-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #febc2e; }
+  .dot-g { background: #28c840; }
+  .screenshot-url {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-left: 8px;
+  }
+  .screenshot-body {
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    position: relative;
+  }
+  .screenshot-body img {
+    width: 100%;
+    border-radius: 4px;
+    display: block;
+  }
+  .screenshot-caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 10px;
+  }
+  .screenshot-icon {
+    font-size: 32px;
+    opacity: 0.2;
+  }
+  .screenshot-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* ── Feature tag ── */
+  .tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin: 2px;
+  }
+  .tag-blue  { background: rgba(90,180,255,0.1);  border: 1px solid rgba(90,180,255,0.2);  color: var(--accent); }
+  .tag-purple{ background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.2); color: var(--accent2); }
+  .tag-green { background: rgba(52,211,153,0.1);  border: 1px solid rgba(52,211,153,0.2);  color: #34d399; }
+  .tag-orange{ background: rgba(251,146,60,0.1);  border: 1px solid rgba(251,146,60,0.2);  color: #fb923c; }
+
+  /* ── File tree ── */
+  .filetree {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 2;
+    margin: 16px 0;
+  }
+  .filetree .dir  { color: var(--accent); }
+  .filetree .file { color: rgba(200,220,255,0.7); }
+  .filetree .indent { padding-left: 20px; }
+  .filetree .size { color: var(--text-dim); font-size: 10px; margin-left: 8px; }
+
+  /* ── Architecture diagram ── */
+  .arch {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .arch-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .arch-card h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .arch-card p { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+
+  /* ── Timeline bar ── */
+  .timeline { position: relative; padding-left: 28px; margin: 24px 0; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px; top: 8px; bottom: 8px;
+    width: 1px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2));
+  }
+  .tl-item { position: relative; margin-bottom: 22px; }
+  .tl-dot {
+    position: absolute;
+    left: -24px; top: 5px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 6px var(--accent);
+  }
+  .tl-item h4 { font-size: 13px; color: #e0eaff; margin-bottom: 4px; }
+  .tl-item p  { font-size: 12px; color: var(--text-dim); }
+
+  /* ── Bug callout ── */
+  .callout {
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 18px 0;
+    font-size: 13.5px;
+    border-left: 3px solid;
+  }
+  .callout-bug   { background: rgba(239,68,68,0.07);  border-color: #ef4444; }
+  .callout-fix   { background: rgba(52,211,153,0.07); border-color: #34d399; }
+  .callout-info  { background: rgba(90,180,255,0.07); border-color: var(--accent); }
+  .callout-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+  .callout-bug   .callout-label { color: #ef4444; }
+  .callout-fix   .callout-label { color: #34d399; }
+  .callout-info  .callout-label { color: var(--accent); }
+
+  /* ── Print ── */
+  @media print {
+    #toc { display: none; }
+    main { margin-left: 0; padding: 20px 40px; }
+    .section { page-break-inside: avoid; }
+    pre { white-space: pre-wrap; }
+  }
+
+  @media (max-width: 900px) {
+    #toc { display: none; }
+    main { margin-left: 0; padding: 0 24px 80px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<nav id="toc">
+  <h2>目录</h2>
+  <a href="#hero">概览</a>
+  <a href="#s0">项目设计</a>
+  <a href="#s1">Step 1 · 工程初始化</a>
+  <a href="#s2">Step 2 · Rain 着色器</a>
+  <a href="#s3">Step 3 · Heartfelt 替换</a>
+  <a href="#s4">Step 4 · 黑屏 Debug</a>
+  <a href="#s5">Step 5 · Snow 着色器</a>
+  <a href="#s6">Step 6 · 背景亮度调优</a>
+  <a href="#s7">Step 7 · UI 可见性优化</a>
+  <a href="#s8">Step 8 · Zen Ambient 音频</a>
+  <a href="#arch">架构总览</a>
+</nav>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<main>
+
+<!-- ── HERO ── -->
+<section id="hero">
+  <div class="badge">Dev Log · 开发全记录</div>
+  <h1>Cyber Zen · 赛博禅<br>完整建造过程</h1>
+  <p>从零构建一个基于 WebGL/GLSL 着色器的全沉浸式冥想写作工具。记录每一轮对话、每一次代码决策与 Debug 过程。</p>
+  <div class="meta-row">
+    <div class="meta-item">
+      <span class="meta-label">完成日期</span>
+      <span class="meta-value">2026 · April</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">项目文件</span>
+      <span class="meta-value">3 files · ~1,200 lines</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">对话轮次</span>
+      <span class="meta-value">11 rounds</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">技术栈</span>
+      <span class="meta-value">Vanilla JS · WebGL1 · Web Audio</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ STEP 0 : DESIGN ══ -->
+<section class="section" id="s0">
+  <div class="step-header">
+    <span class="step-num">STEP 00</span>
+    <h2>需求设计与视觉规范</h2>
+  </div>
+
+  <h3>// 核心功能需求（用户提案）</h3>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      一、核心功能(模块与关键特性)<br>
+      1、视觉底座(The Canvas)，基于WebGL/Shader的全屏动态背景。双模式：Rainy（雨天）、Snowy（下雪）<br>
+      2、沉浸编辑器(The Deck)，无边框毛玻璃输入框，三种内置字体。<br>
+      3、氛围控制台(Vibe Mixer)，隐藏式浮窗。滑杆控制：雨量、模糊度、白噪音音量、音乐融合<br>
+      4、心流计时器(ZenTimer)，极简线性/环形消融倒计时。<br>
+      5、数据管理(Privacy)，纯前端运行，LocalStorage实时暂存，支持导出.txt。
+    </div>
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      二、视觉规范(Visual Vibe)<br>
+      1. 风格：赛博禅意(Cyber Zen) / 极简主义。<br>
+      2. 交互：<br>
+      - 所有UI元素在非活跃状态下透明度趋近于0，鼠标移入时优雅淡入<br>
+      - 模式切换器：位于屏幕顶部的极简文字(Rain/Star)，仅在鼠标悬浮在顶部50px区域时显现。<br>
+      - 统一逻辑：无论切换到哪个模式，毛玻璃文字框的状态、内容、字体设置均保持一致。
+    </div>
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      https://www.shadertoy.com/ — 着色器参考网站<br>
+      雨滴关键词：<strong>Heartfelt</strong>（BigWings）<br>
+      下雪关键词：<strong>Just snow</strong>（baldand）
+    </div>
+  </div>
+
+  <h3>// 五大模块拆解</h3>
+  <div class="arch">
+    <div class="arch-card">
+      <h4>The Canvas</h4>
+      <p>WebGL 全屏 Quad，两套 GLSL 片段着色器，RAF 60fps 渲染循环</p>
+    </div>
+    <div class="arch-card">
+      <h4>The Deck</h4>
+      <p>毛玻璃 textarea，三字体循环，输入防抖自动保存，focus 状态联动透明度</p>
+    </div>
+    <div class="arch-card">
+      <h4>Vibe Mixer</h4>
+      <p>隐藏式浮窗，四路滑杆实时映射到 Canvas uniform / CSS 变量 / Web Audio gain</p>
+    </div>
+    <div class="arch-card">
+      <h4>ZenTimer</h4>
+      <p>SVG 环形进度，三档预设，毫秒级 30s interval 倒计，结束光效脉冲</p>
+    </div>
+    <div class="arch-card">
+      <h4>Privacy / Storage</h4>
+      <p>纯 LocalStorage，JSON 序列化，导出时 Blob URL 触发下载，无服务器依赖</p>
+    </div>
+    <div class="arch-card">
+      <h4>Audio Engine</h4>
+      <p>Web Audio API，白噪音缓冲 + 藏式颂钵合成，双延迟混响，随机间隔敲击</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ STEP 1 : INIT ══ -->
+<section class="section" id="s1">
+  <div class="step-header">
+    <span class="step-num">STEP 01</span>
+    <h2>工程初始化 · 三文件架构</h2>
+  </div>
+
+  <p>采用零依赖的纯前端架构，不引入任何框架或构建工具，仅三个文件组成完整应用。</p>
+
+  <div class="filetree">
+    <div><span class="dir">Cyber_Zen/</span></div>
+    <div class="indent"><span class="file">index.html</span><span class="size">— 页面骨架，6 个核心 DOM 节点</span></div>
+    <div class="indent"><span class="file">style.css</span><span class="size">— 视觉规范，CSS 变量 + 毛玻璃系统</span></div>
+    <div class="indent"><span class="file">app.js</span><span class="size">— 9 个模块的单入口 IIFE</span></div>
+  </div>
+
+  <h3>// index.html 骨架</h3>
+  <p>页面共 6 个主节点，每个节点对应一个功能模块，所有 UI 默认 <code>opacity: 0</code>，通过 JS/CSS 事件控制显隐。</p>
+
+<pre><span class="cmt">&lt;!-- WebGL 全屏画布 --&gt;</span>
+<span class="kw">&lt;canvas</span> id=<span class="str">"bg-canvas"</span><span class="kw">&gt;&lt;/canvas&gt;</span>
+
+<span class="cmt">&lt;!-- 顶部模式切换器 ← 鼠标进入顶部 50px 才显现 --&gt;</span>
+<span class="kw">&lt;div</span> id=<span class="str">"mode-bar"</span><span class="kw">&gt;</span>
+  Rain / Star
+<span class="kw">&lt;/div&gt;</span>
+
+<span class="cmt">&lt;!-- 沉浸编辑器 --&gt;</span>
+<span class="kw">&lt;div</span> id=<span class="str">"deck"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;textarea</span> id=<span class="str">"editor"</span><span class="kw">&gt;&lt;/textarea&gt;</span>
+  <span class="kw">&lt;div</span> id=<span class="str">"deck-toolbar"</span><span class="kw">&gt;</span> A ⏱ ↓ <span class="kw">&lt;/div&gt;</span>
+<span class="kw">&lt;/div&gt;</span>
+
+<span class="cmt">&lt;!-- Vibe Mixer 圆钮 + 浮窗 --&gt;</span>
+<span class="kw">&lt;div</span> id=<span class="str">"mixer-toggle"</span><span class="kw">&gt;&lt;/div&gt;</span>
+<span class="kw">&lt;div</span> id=<span class="str">"vibe-mixer"</span><span class="kw">&gt;&lt;/div&gt;</span>
+
+<span class="cmt">&lt;!-- ZenTimer --&gt;</span>
+<span class="kw">&lt;div</span> id=<span class="str">"zen-timer"</span><span class="kw">&gt;&lt;/div&gt;</span></pre>
+
+  <h3>// CSS 变量系统</h3>
+  <p>所有颜色与尺寸集中在 <code>:root</code> 定义，毛玻璃效果通过 CSS 自定义属性 <code>--glass-blur</code> 由 Vibe Mixer 滑杆实时驱动。</p>
+<pre><span class="fn">:root</span> {
+  <span class="kw">--glass-bg</span>:     <span class="str">rgba(10, 12, 18, 0.35)</span>;
+  <span class="kw">--glass-border</span>: <span class="str">rgba(255, 255, 255, 0.06)</span>;
+  <span class="kw">--glass-blur</span>:   <span class="num">18px</span>;     <span class="cmt">/* ← Blur 滑杆实时修改此值 */</span>
+  <span class="kw">--text-color</span>:   <span class="str">rgba(220, 225, 235, 0.88)</span>;
+  <span class="kw">--accent</span>:       <span class="str">rgba(100, 180, 255, 0.6)</span>;
+  <span class="kw">--font-1</span>: <span class="str">'LXGW WenKai'</span>, cursive;   <span class="cmt">/* 霞鹜文楷 */</span>
+  <span class="kw">--font-2</span>: <span class="str">'Noto Serif SC'</span>, serif;   <span class="cmt">/* 思源宋体 */</span>
+  <span class="kw">--font-3</span>: <span class="str">'JetBrains Mono'</span>, monospace; <span class="cmt">/* 代码体 */</span>
+}</pre>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8080 · 初始骨架</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🖥️</div>
+      <div class="screenshot-hint">截图：项目文件创建完成后，浏览器中打开 index.html 的初始状态<br>（全黑背景，各 UI 元素已存在但透明度为 0）</div>
+    </div>
+    <div class="screenshot-caption">Fig 1 · 工程初始化后的页面骨架</div>
+  </div>
+</section>
+
+<!-- ══ STEP 2 : ORIGINAL RAIN ══ -->
+<section class="section" id="s2">
+  <div class="step-header">
+    <span class="step-num">STEP 02</span>
+    <h2>WebGL 渲染管线 · 原创 Rain 着色器</h2>
+  </div>
+
+  <p>首先搭建 WebGL 渲染器 <code>Canvas</code> 模块，实现以下管线：</p>
+  <ol>
+    <li>初始化 WebGL 上下文，绑定全屏四边形（2 个三角形 = 4 顶点）</li>
+    <li>编译并链接顶点着色器 + 片段着色器</li>
+    <li>RAF 渲染循环，每帧更新 <code>uTime</code>、<code>uRes</code>、<code>uIntensity</code> 三个 uniform</li>
+  </ol>
+
+  <h3>// 顶点着色器（极简）</h3>
+<pre><span class="kw">attribute</span> vec2 aPos;
+<span class="kw">void</span> <span class="fn">main</span>(){
+  gl_Position = <span class="fn">vec4</span>(aPos, <span class="num">0.0</span>, <span class="num">1.0</span>);
+}</pre>
+
+  <h3>// 渲染循环核心</h3>
+<pre><span class="fn">_loop</span>() {
+  <span class="kw">const</span> gl = <span class="kw">this</span>.gl;
+  <span class="kw">const</span> p  = <span class="kw">this</span>.programs[<span class="kw">this</span>.current]; <span class="cmt">// 'rain' | 'snow'</span>
+  gl.<span class="fn">useProgram</span>(p.pg);
+  
+  <span class="kw">const</span> now = performance.now() / <span class="num">1000</span> - <span class="kw">this</span>.startTime;
+  gl.<span class="fn">uniform2f</span>(p.uRes, gl.canvas.width, gl.canvas.height);
+  gl.<span class="fn">uniform1f</span>(p.uTime, now);
+  gl.<span class="fn">uniform1f</span>(p.uIntensity, <span class="kw">this</span>.intensity);
+  
+  gl.<span class="fn">drawArrays</span>(gl.TRIANGLE_STRIP, <span class="num">0</span>, <span class="num">4</span>);
+  <span class="kw">this</span>.animId = <span class="fn">requestAnimationFrame</span>(() => <span class="kw">this</span>.<span class="fn">_loop</span>());
+}</pre>
+
+  <p>初版雨滴着色器使用整数哈希噪声驱动多层滑落雨点，每一层独立位移形成视差感。背景为程序化 bokeh 灯光。</p>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8080 · Rain Mode v1</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🌧️</div>
+      <div class="screenshot-hint">截图：原创雨滴着色器效果 — 模糊 bokeh 城市灯光背景 + 多层视差雨滴</div>
+    </div>
+    <div class="screenshot-caption">Fig 2 · 原创雨滴着色器 + WebGL 渲染管线</div>
+  </div>
+</section>
+
+<!-- ══ STEP 3 : HEARTFELT ══ -->
+<section class="section" id="s3">
+  <div class="step-header">
+    <span class="step-num">STEP 03</span>
+    <h2>接入 Heartfelt 着色器</h2>
+  </div>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      ［粘贴了 Heartfelt 完整 GLSL 源码］切换到 Rain 时候用这个效果
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      将 Heartfelt shader 适配到 WebGL 上下文：<code>iResolution</code>→<code>uRes</code>，<code>iTime</code>→<code>uTime</code>，<code>textureLod(iChannel0,...)</code> 替换为程序化 bokeh 背景函数。
+    </div>
+  </div>
+
+  <h3>// Heartfelt 核心算法</h3>
+  <p>Heartfelt 由 Martijn Steinrucken（BigWings）创作，包含三层雨水模拟：</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>StaticDrops — 静态附着水珠</h4>
+      <p>随机分布在玻璃表面，通过 <code>Saw</code> 函数控制出现/消失的淡出节奏</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>DropLayer2 — 滑落雨滴</h4>
+      <p>含完整物理：水滴主体 + 细尾迹 + 前缘小水珠，水平方向随高度正弦摆动</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>Drops — 多层合成</h4>
+      <p>三层叠加（静态×2倍、Layer1、Layer2×1.85缩放），<code>uIntensity</code> 控制每层权重</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>法线 + 折射</h4>
+      <p>用差分 <code>vec2(cx-c.x, cy-c.x)</code> 计算表面法线，扰动 UV 采样背景产生折射效果</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>背景替换</h4>
+      <p>原版用 <code>textureLod(iChannel0,...)</code> 采样外部贴图；WebGL 无贴图，替换为 50 个程序化 bokeh 光斑函数</p>
+    </div>
+  </div>
+
+<pre><span class="cmt">// 折射计算（expensive normals）</span>
+vec2 e  = <span class="fn">vec2</span>(<span class="num">.001</span>, <span class="num">0.</span>);
+<span class="kw">float</span> cx = <span class="fn">Drops</span>(uv+e,   t, sd, l1, l2).x;
+<span class="kw">float</span> cy = <span class="fn">Drops</span>(uv+e.yx, t, sd, l1, l2).x;
+vec2  n  = <span class="fn">vec2</span>(cx - c.x, cy - c.x);  <span class="cmt">// 表面法线偏移</span>
+
+<span class="kw">float</span> focus = <span class="fn">mix</span>(maxBlur - c.y, minBlur, <span class="fn">S</span>(<span class="num">.1</span>, <span class="num">.2</span>, c.x));
+vec3  col   = <span class="fn">background</span>(UV + n, focus); <span class="cmt">// 折射后的背景坐标</span></pre>
+</section>
+
+<!-- ══ STEP 4 : DEBUG ══ -->
+<section class="section" id="s4">
+  <div class="step-header">
+    <span class="step-num">STEP 04</span>
+    <h2>黑屏 Debug · GLSL ES 未定义行为</h2>
+  </div>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      刷新页面背景后页面还是黑的
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      检查中……创建 test.html 测试页，在浏览器内显示 WebGL 报错信息。
+    </div>
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      绿色日志没有 compile error 或 link error。有显示，很暗的紫色光斑
+    </div>
+  </div>
+
+  <div class="callout callout-bug">
+    <div class="callout-label">🐛 根本原因</div>
+    Heartfelt 原版大量使用 <strong>edge0 &gt; edge1 的 smoothstep 调用</strong>（如 <code>S(0.4, 0.0, d)</code>、<code>S(1.0, y, st.y)</code>），在 GLSL ES 1.0（WebGL1/ANGLE/Windows）中这属于<strong>未定义行为</strong>，实际产生 <strong>NaN</strong>，一旦有一个像素计算出 NaN，通过加法传播导致整块区域变黑。
+  </div>
+
+  <div class="callout callout-fix">
+    <div class="callout-label">✅ 修复方案</div>
+    用安全的手写 <code>S()</code> 函数替换宏定义，通过 <code>abs(d) &lt; 1e-7</code> 防止除零，同时保持双向 smoothstep 都能正常工作。
+  </div>
+
+<pre><span class="cmt">// ❌ 原版宏 — edge0 > edge1 时未定义行为</span>
+<span class="kw">#define</span> S(a, b, t) <span class="fn">smoothstep</span>(a, b, t)
+
+<span class="cmt">// ✅ 修复版本 — 处理反向边和 0/0 除零</span>
+<span class="kw">float</span> <span class="fn">S</span>(<span class="kw">float</span> a, <span class="kw">float</span> b, <span class="kw">float</span> t) {
+  <span class="kw">float</span> d    = b - a;
+  <span class="kw">float</span> safe = <span class="fn">abs</span>(d) &lt; <span class="num">1e-7</span> ? <span class="num">1e-7</span> : d; <span class="cmt">// 防止 0/0 = NaN</span>
+  <span class="kw">float</span> x    = <span class="fn">clamp</span>((t - a) / safe, <span class="num">0.0</span>, <span class="num">1.0</span>);
+  <span class="kw">return</span> x * x * (<span class="num">3.0</span> - <span class="num">2.0</span> * x);         <span class="cmt">// 标准三次多项式</span>
+}</pre>
+
+  <h3>// 调试工具：test.html</h3>
+  <p>创建了独立测试页，在页面左上角渲染绿色日志面板，直接显示：WebGL 版本、渲染器信息、每个着色器的编译/链接状态与错误信息。</p>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090/test.html · Debug 测试页</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🔍</div>
+      <div class="screenshot-hint">截图：test.html 测试页 — 左上角绿色日志显示「Vertex shader OK · Fragment shader OK · Rendering...」</div>
+    </div>
+    <div class="screenshot-caption">Fig 3 · test.html 实时日志调试界面</div>
+  </div>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Heartfelt 修复后</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🌧️</div>
+      <div class="screenshot-hint">截图：修复 NaN 后的 Heartfelt 雨滴效果 — 玻璃上的大颗雨滴、细长尾迹，以及通过折射法线扭曲的 bokeh 城市灯光</div>
+    </div>
+    <div class="screenshot-caption">Fig 4 · Heartfelt 雨滴着色器正常渲染效果</div>
+  </div>
+</section>
+
+<!-- ══ STEP 5 : SNOW ══ -->
+<section class="section" id="s5">
+  <div class="step-header">
+    <span class="step-num">STEP 05</span>
+    <h2>接入 Just Snow 着色器</h2>
+  </div>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      ［粘贴了 Just snow 完整 GLSL 源码］SNOW 用这个效果
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      适配 <code>iResolution</code>→<code>uRes</code>，<code>iTime</code>→<code>uTime</code>，移除 <code>iMouse</code>（静态视角），用 <code>uIntensity</code> 插值 LAYERS/DEPTH/WIDTH/SPEED 参数。WebGL1 循环需有常量上限，用 <code>for(i&lt;200) if(i&gt;=LAYERS) break</code> 技巧绕过。
+    </div>
+  </div>
+
+  <h3>// Just Snow 算法结构</h3>
+  <p>Andrew Baldwin（baldand）的作品，每个迭代层独立计算雪花的位置和大小，通过视差（depth）产生空间感，DoF 效果让远近层模糊程度不同。</p>
+
+<pre><span class="kw">for</span> (<span class="kw">int</span> i = <span class="num">0</span>; i &lt; <span class="num">200</span>; i++) {
+  <span class="kw">if</span> (i &gt;= LAYERS) <span class="kw">break</span>;         <span class="cmt">// WebGL1 循环必须有常量上限</span>
+  <span class="kw">float</span> fi = <span class="kw">float</span>(i);
+  
+  <span class="kw">float</span> fi = <span class="kw">float</span>(i);
+  vec2 q = uv * (<span class="num">1.0</span> + fi * DEPTH);  <span class="cmt">// 视差缩放</span>
+  q += vec2(
+    q.y * (WIDTH * <span class="fn">mod</span>(fi*<span class="num">7.238917</span>,<span class="num">1.</span>) - WIDTH*<span class="num">.5</span>), <span class="cmt">// 左右漂移</span>
+    SPEED * uTime / (<span class="num">1.</span> + fi*DEPTH*<span class="num">.03</span>)               <span class="cmt">// 竖直落速</span>
+  );
+  
+  <span class="cmt">// 菱形雪花 SDF</span>
+  vec2 s = <span class="fn">abs</span>(<span class="fn">mod</span>(q,<span class="num">1.</span>)<span class="num">-.5</span>+<span class="num">.9</span>*r.xy<span class="num">-.45</span>);
+  <span class="kw">float</span> d = <span class="num">.6</span>*<span class="fn">max</span>(s.x-s.y,s.x+s.y)+<span class="fn">max</span>(s.x,s.y)<span class="num">-.01</span>;
+  <span class="kw">float</span> edge = <span class="num">.005</span>+<span class="num">.05</span>*<span class="fn">min</span>(<span class="num">.5</span>*<span class="fn">abs</span>(fi-<span class="num">5.</span>-dof),<span class="num">1.</span>); <span class="cmt">// DoF 边缘模糊</span>
+  acc += vec3(<span class="fn">smoothstep</span>(edge,-edge,d)*(...));
+}</pre>
+
+  <p><code>uIntensity</code> 滑杆从左到右对应从轻雪（50层）到暴风雪（200层），DEPTH/WIDTH/SPEED 同步插值变化。</p>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Star/Snow Mode</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">❄️</div>
+      <div class="screenshot-hint">截图：Just Snow 着色器效果 — 纯黑背景上白色多层视差雪花，近大远小，边缘带景深虚化</div>
+    </div>
+    <div class="screenshot-caption">Fig 5 · Just Snow 多层视差雪花效果</div>
+  </div>
+</section>
+
+<!-- ══ STEP 6 : BRIGHTNESS ══ -->
+<section class="section" id="s6">
+  <div class="step-header">
+    <span class="step-num">STEP 06</span>
+    <h2>Rain 背景亮度调优</h2>
+  </div>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      还是有点暗，不通透
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      问题：底色太暗、bokeh 光斑太少，后处理 <code>col *= vec3(.8,.6,.9)</code> 叠了紫色调暗，暗角系数 0.8 也太重。
+    </div>
+  </div>
+
+  <h3>// 三轮亮度迭代</h3>
+  <p>经过三轮调整，最终确定的背景参数：</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>Round 1 — 基础提亮</h4>
+      <p>底色从 <code>vec3(0.012,0.015,0.04)</code> 提升到 <code>vec3(0.02,0.03,0.08)</code>，bokeh 乘数 0.12→0.18</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>Round 2 — 大幅提亮 + 后处理减弱</h4>
+      <p>底色提升到 <code>vec3(0.06,0.05,0.12)</code>，增加 glow 层，bokeh 增至 40 个，紫色调改为冷色调，暗角 0.8→0.6</p>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <h4>Round 3 — 玻璃通透感</h4>
+      <p>底色 <code>vec3(0.15,0.12,0.22)</code>，双层辉光（城市暖光 + 天空冷光），bokeh 增至 50 个，加入 blur 感知的雾气漫射层，暗角降至 0.3</p>
+    </div>
+  </div>
+
+<pre><span class="cmt">// 最终版背景 — 模拟雾玻璃透光质感</span>
+vec3 col = <span class="fn">mix</span>(vec3(<span class="num">.15,.12,.22</span>), vec3(<span class="num">.22,.20,.35</span>), uv.y);
+
+<span class="cmt">// 城市底部暖色辉光</span>
+<span class="kw">float</span> glow = <span class="fn">smoothstep</span>(<span class="num">.8</span>, <span class="num">.0</span>, uv.y);
+col += glow * vec3(<span class="num">.25,.18,.12</span>) * <span class="num">0.6</span>;
+
+<span class="cmt">// blur 越大整体越亮 (模拟 mip 采样效果)</span>
+col += vec3(<span class="num">.04,.035,.06</span>) * blur * <span class="num">0.3</span>;
+
+<span class="cmt">// 极轻暗角</span>
+col *= <span class="num">1.0</span> - <span class="fn">dot</span>(uvV, uvV) * <span class="num">0.3</span>;</pre>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Rain 背景调优后</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🌆</div>
+      <div class="screenshot-hint">截图：调优后的雨天背景 — 可见紫蓝色调的玻璃雾感，下方城市暖色辉光，多彩 bokeh 灯点隐约可见</div>
+    </div>
+    <div class="screenshot-caption">Fig 6 · 背景亮度调优最终效果</div>
+  </div>
+</section>
+
+<!-- ══ STEP 7 : UI ══ -->
+<section class="section" id="s7">
+  <div class="step-header">
+    <span class="step-num">STEP 07</span>
+    <h2>UI 可见性优化</h2>
+  </div>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      Vibe Mixer 和其余几个 button 尺寸都太小，并且在背景中颜色不明显
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      一次性修改 6 处样式：工具栏按钮、Mixer 圆钮、Mixer 面板、标题文字、标签文字、滑杆。
+    </div>
+  </div>
+
+  <h3>// 尺寸与对比度对比</h3>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:12px;margin:16px 0;">
+      <thead>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+          <th style="text-align:left;padding:10px 12px;color:var(--text-dim);font-weight:400;letter-spacing:1px;">元素</th>
+          <th style="text-align:left;padding:10px 12px;color:var(--text-dim);font-weight:400;letter-spacing:1px;">修改前</th>
+          <th style="text-align:left;padding:10px 12px;color:var(--accent);font-weight:400;letter-spacing:1px;">修改后</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:9px 12px;color:var(--text);">工具栏按钮字号</td>
+          <td style="padding:9px 12px;color:var(--text-dim);">13px · padding 6×14</td>
+          <td style="padding:9px 12px;color:#34d399;">15px · padding 10×22</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:9px 12px;color:var(--text);">Mixer 圆钮</td>
+          <td style="padding:9px 12px;color:var(--text-dim);">40×40px · opacity 0.4</td>
+          <td style="padding:9px 12px;color:#34d399;">52×52px · opacity 0.7</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:9px 12px;color:var(--text);">Mixer 面板宽度</td>
+          <td style="padding:9px 12px;color:var(--text-dim);">240px</td>
+          <td style="padding:9px 12px;color:#34d399;">280px</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:9px 12px;color:var(--text);">滑杆轨道高度</td>
+          <td style="padding:9px 12px;color:var(--text-dim);">3px · 拇指 14px</td>
+          <td style="padding:9px 12px;color:#34d399;">4px · 拇指 18px</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:9px 12px;color:var(--text);">UI 文字颜色</td>
+          <td style="padding:9px 12px;color:var(--text-dim);">rgba(…, 0.4)</td>
+          <td style="padding:9px 12px;color:#34d399;">rgba(…, 0.65-0.8)</td>
+        </tr>
+        <tr>
+          <td style="padding:9px 12px;color:var(--text);">Hover 效果</td>
+          <td style="padding:9px 12px;color:var(--text-dim);">仅变色</td>
+          <td style="padding:9px 12px;color:#34d399;">变色 + box-shadow 蓝色光晕</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Vibe Mixer 打开状态</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🎛️</div>
+      <div class="screenshot-hint">截图：Vibe Mixer 面板展开 — 四路滑杆（Intensity · Blur · White Noise · Ambient）清晰可见，右下角圆形按钮更大更亮</div>
+    </div>
+    <div class="screenshot-caption">Fig 7 · UI 可见性优化后的 Vibe Mixer 面板</div>
+  </div>
+</section>
+
+<!-- ══ STEP 8 : AUDIO ══ -->
+<section class="section" id="s8">
+  <div class="step-header">
+    <span class="step-num">STEP 08</span>
+    <h2>Zen Ambient 音频引擎</h2>
+  </div>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      换一首 AMBIENT，更显得有禅意一些
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      D 五声音阶和声 + LFO 微漂 + 1.2s 延迟混响
+    </div>
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      想要更禅意一些的
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      全面重写：136.1Hz OM 频率底音 + 6Hz theta 差拍 + 藏式颂钵随机定时敲击 + 双延迟混响
+    </div>
+  </div>
+
+  <h3>// 三层音频架构</h3>
+
+  <div class="arch">
+    <div class="arch-card">
+      <h4>Layer 1 · 呼吸底音</h4>
+      <p>136.1Hz（地球年共振 / OM频率）+ 142.1Hz，产生 <strong>6Hz Theta 差拍</strong>，对应脑波冥想状态。每个声部有 0.04Hz LFO 微漂。</p>
+    </div>
+    <div class="arch-card">
+      <h4>Layer 2 · 颂钵敲击</h4>
+      <p>222Hz 基频 + 2.76× + 5.2× 泛音，各自独立指数衰减（6s/4s/2.5s）。<strong>随机 7-16 秒</strong>触发，模拟真实敲击节奏。</p>
+    </div>
+    <div class="arch-card">
+      <h4>Layer 3 · 混响空间</h4>
+      <p>双延迟线 1.8s + 2.7s，各带低通滤波反馈（0.45/0.35 反馈量），模拟石室混响拖尾。</p>
+    </div>
+  </div>
+
+<pre><span class="cmt">// 颂钵敲击 — 三个泛音独立衰减</span>
+<span class="kw">const</span> partials = [
+  { f: <span class="num">222.0</span>,            vol: <span class="num">0.18</span>, decay: <span class="num">6.0</span>  },  <span class="cmt">// 基频</span>
+  { f: <span class="num">222.0</span> * <span class="num">2.76</span>,    vol: <span class="num">0.07</span>, decay: <span class="num">4.0</span>  },  <span class="cmt">// 第一泛音</span>
+  { f: <span class="num">222.0</span> * <span class="num">5.20</span>,    vol: <span class="num">0.025</span>, decay: <span class="num">2.5</span> },  <span class="cmt">// 第二泛音</span>
+];
+
+partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
+  <span class="kw">const</span> env = ctx.<span class="fn">createGain</span>();
+  env.gain.<span class="fn">setValueAtTime</span>(<span class="num">0</span>, now);
+  env.gain.<span class="fn">linearRampToValueAtTime</span>(vol * ambientLevel, now + <span class="num">0.012</span>); <span class="cmt">// 急攻</span>
+  env.gain.<span class="fn">exponentialRampToValueAtTime</span>(<span class="num">0.0001</span>, now + decay);        <span class="cmt">// 缓衰</span>
+});
+
+<span class="cmt">// 随机定时 7-16 秒触发</span>
+<span class="kw">const</span> tick = () => {
+  <span class="kw">this</span>.<span class="fn">_strikeBowl</span>();
+  <span class="kw">this</span>._bowlTimer = <span class="fn">setTimeout</span>(tick, <span class="num">7000</span> + Math.<span class="fn">random</span>() * <span class="num">9000</span>);
+};</pre>
+
+  <div class="callout callout-info">
+    <div class="callout-label">🔊 科学依据</div>
+    <strong>Theta 差拍（6Hz）</strong>：双耳差拍（Binaural Beat）是神经科学中研究较多的技术，左右耳输入相差 4-8Hz 时，大脑会"感知"到一个同频率的差拍振荡，与 Theta 脑波（与冥想、REM 睡眠相关）同频。<br>
+    <strong>136.1Hz</strong>：基于一年 365.25 天的地球公转周期计算出的音频频率，在东西方冥想传统中常被称为"OM 频率"。
+  </div>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Ambient 滑杆推至 70%</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🔔</div>
+      <div class="screenshot-hint">截图：Vibe Mixer 中 Ambient 滑杆推高后，颂钵音效随机响起，延迟混响在空间里拖尾扩散</div>
+    </div>
+    <div class="screenshot-caption">Fig 8 · Zen Ambient 颂钵音频引擎</div>
+  </div>
+</section>
+
+<!-- ══ ARCHITECTURE ══ -->
+<section class="section" id="arch">
+  <div class="step-header">
+    <span class="step-num">FINAL</span>
+    <h2>完整架构总览</h2>
+  </div>
+
+  <h3>// 数据流关系图</h3>
+<pre>
+  ┌─────────────────────────────────────────────┐
+  │                   app.js                   │
+  │                                             │
+  │  §1 GLSL Sources                           │
+  │    RAIN_FRAG ──────────────────────┐        │
+  │    SNOW_FRAG ──────────────────────┤        │
+  │                                    ▼        │
+  │  §2 Canvas (WebGL)       ┌─────────────┐   │
+  │    _buildProgram()  ◄────│  programs   │   │
+  │    _loop() → RAF         │  rain/snow  │   │
+  │    uTime/uRes/uIntensity └─────────────┘   │
+  │           ▲                                 │
+  │  §6 Mixer ─┤ intensity                      │
+  │            ├ blur → CSS --glass-blur        │
+  │            ├ noise → §3 Audio.setNoise()    │
+  │            └ music → §3 Audio.setAmbient()  │
+  │                                             │
+  │  §3 Audio Engine                            │
+  │    白噪音 Buffer ← noiseGain                │
+  │    颂钵 Partials ← ambientGain              │
+  │    双延迟混响 (1.8s + 2.7s)                 │
+  │    随机定时器 _scheduleBowl()               │
+  │                                             │
+  │  §4 Storage (LocalStorage)                  │
+  │    text / font / mode / mixer / timer       │
+  │    exportTxt() → Blob URL                   │
+  │                                             │
+  │  §5 Editor (Deck)                           │
+  │    font cycle → class font-wenkai/serif/mono│
+  │    input debounce → Storage.save()          │
+  │                                             │
+  │  §7 Timer                                   │
+  │    SVG ring → stroke-dashoffset            │
+  │    presets: 15/25/45 min                   │
+  │                                             │
+  │  §8 Mode Switcher                           │
+  │    mousemove → top 50px → mode-bar visible │
+  │    'rain'/'snow' → Canvas.setMode()         │
+  └─────────────────────────────────────────────┘
+</pre>
+
+  <h3>// 技术标签</h3>
+  <div style="margin-top:8px;">
+    <span class="tag tag-blue">WebGL 1.0</span>
+    <span class="tag tag-blue">GLSL ES 1.0</span>
+    <span class="tag tag-blue">requestAnimationFrame</span>
+    <span class="tag tag-purple">Web Audio API</span>
+    <span class="tag tag-purple">OscillatorNode</span>
+    <span class="tag tag-purple">DelayNode</span>
+    <span class="tag tag-purple">BiquadFilterNode</span>
+    <span class="tag tag-green">CSS backdrop-filter</span>
+    <span class="tag tag-green">CSS Custom Properties</span>
+    <span class="tag tag-green">SVG stroke-dashoffset</span>
+    <span class="tag tag-orange">LocalStorage</span>
+    <span class="tag tag-orange">Blob URL</span>
+    <span class="tag tag-orange">IIFE 模块化</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>// 最终完整效果</h3>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Rain Mode · 全貌</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🌧️</div>
+      <div class="screenshot-hint">截图：Rain 模式全貌 — 玻璃雨滴折射城市 bokeh 灯点，中央毛玻璃编辑器，底部 Vibe Mixer 控制台</div>
+    </div>
+    <div class="screenshot-caption">Fig 9 · Rain Mode 完整效果</div>
+  </div>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Star Mode · 全貌</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">❄️</div>
+      <div class="screenshot-hint">截图：Star/Snow 模式全貌 — 多层视差雪花飘落，景深效果让远处雪花虚化，中央编辑器内容与字体设置与 Rain 模式保持一致</div>
+    </div>
+    <div class="screenshot-caption">Fig 10 · Star Mode 完整效果</div>
+  </div>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · ZenTimer · 倒计时中</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">⏱️</div>
+      <div class="screenshot-hint">截图：ZenTimer 倒计时界面 — SVG 环形进度条随时间消融，中央数字显示剩余时间，底部可选 15/25/45 分钟预设</div>
+    </div>
+    <div class="screenshot-caption">Fig 11 · ZenTimer 极简环形计时器</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div style="text-align:center;padding:40px 0 20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:3px;">
+    CYBER ZEN · 赛博禅 · 2026<br>
+    <span style="color:var(--accent);margin-top:8px;display:block;">
+      Built with WebGL · Web Audio API · 0 dependencies
+    </span>
+  </div>
+</section>
+
+</main>
+
+<script>
+// Highlight active TOC item on scroll
+const sections = document.querySelectorAll('section[id]');
+const links = document.querySelectorAll('#toc a');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector(`#toc a[href="#${e.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { threshold: 0.3 });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
