@@ -355,13 +355,14 @@
     ambientGain: null,
     noiseNode: null,
     ambientOscs: [],
-    _started: false,
+    _bowlTimer: null,
+    _ambientLevel: 0,
 
     _ensureCtx() {
       if (this.ctx) return;
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
 
-      // --- White noise ---
+      // --- White noise (rain texture) ---
       const bufSize = this.ctx.sampleRate * 2;
       const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
       const data = buf.getChannelData(0);
@@ -369,43 +370,100 @@
       this.noiseNode = this.ctx.createBufferSource();
       this.noiseNode.buffer = buf;
       this.noiseNode.loop = true;
-
-      // bandpass to soften
       const bp = this.ctx.createBiquadFilter();
       bp.type = 'bandpass'; bp.frequency.value = 800; bp.Q.value = 0.5;
-
       this.noiseGain = this.ctx.createGain();
       this.noiseGain.gain.value = 0;
       this.noiseNode.connect(bp).connect(this.noiseGain).connect(this.ctx.destination);
       this.noiseNode.start();
 
-      // --- Ambient drone ---
+      // --- Zen ambient bus ---
       this.ambientGain = this.ctx.createGain();
       this.ambientGain.gain.value = 0;
-      const freqs = [65.41, 98.00, 130.81, 196.00];   // C2, G2, C3, G3
-      freqs.forEach(f => {
+
+      // Long reverb tail: two delay lines with filtered feedback
+      const mkDelay = (time, fbAmt, cutoff) => {
+        const d  = this.ctx.createDelay(4.0);
+        const f  = this.ctx.createBiquadFilter();
+        const fg = this.ctx.createGain();
+        d.delayTime.value = time;
+        f.type = 'lowpass'; f.frequency.value = cutoff;
+        fg.gain.value = fbAmt;
+        d.connect(f).connect(fg).connect(d);       // feedback loop
+        this.ambientGain.connect(d);
+        fg.connect(this.ctx.destination);          // wet out
+      };
+      mkDelay(1.8,  0.45, 800);
+      mkDelay(2.7,  0.35, 500);
+
+      // Dry path through low-pass
+      const dryLP = this.ctx.createBiquadFilter();
+      dryLP.type = 'lowpass'; dryLP.frequency.value = 900;
+      this.ambientGain.connect(dryLP).connect(this.ctx.destination);
+
+      // Continuous breath-drone: 136.1 Hz (Earth-year resonance, "OM" frequency)
+      // + a theta-beat partner 6 Hz higher to induce meditative brainwave entrainment
+      [[136.1, 0.028], [142.1, 0.018]].forEach(([f, vol]) => {
         const osc = this.ctx.createOscillator();
         osc.type = 'sine';
         osc.frequency.value = f;
-        const g = this.ctx.createGain();
-        g.gain.value = 0.08;
+        // micro-drift LFO (0.04 Hz, ±0.15%)
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine'; lfo.frequency.value = 0.04;
+        const lg = this.ctx.createGain(); lg.gain.value = f * 0.0015;
+        lfo.connect(lg).connect(osc.frequency); lfo.start();
+        const g = this.ctx.createGain(); g.gain.value = vol;
         osc.connect(g).connect(this.ambientGain);
         osc.start();
         this.ambientOscs.push(osc);
       });
-      // reverb‑like filter
-      const lp = this.ctx.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 400;
-      this.ambientGain.connect(lp).connect(this.ctx.destination);
+
+      // Schedule periodic singing-bowl strikes
+      this._scheduleBowl();
     },
 
-    setNoise(v) {         // 0‒1
+    // Tibetan singing bowl simulation
+    // Real bowls: strong fundamental + overtone at ~2.76× + 5.2× the fundamental
+    _strikeBowl() {
+      if (!this.ctx || this._ambientLevel < 0.01) return;
+      const now  = this.ctx.currentTime;
+      const root = 222.0;   // ~A3-ish, warm bowl pitch
+      const partials = [
+        { f: root,        vol: 0.18, decay: 6.0  },
+        { f: root * 2.76, vol: 0.07, decay: 4.0  },
+        { f: root * 5.20, vol: 0.025, decay: 2.5 },
+      ];
+      partials.forEach(({ f, vol, decay }) => {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        const env = this.ctx.createGain();
+        env.gain.setValueAtTime(0, now);
+        env.gain.linearRampToValueAtTime(vol * this._ambientLevel, now + 0.012);
+        env.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+        osc.connect(env).connect(this.ambientGain);
+        osc.start(now);
+        osc.stop(now + decay + 0.1);
+      });
+    },
+
+    _scheduleBowl() {
+      const interval = () => 7000 + Math.random() * 9000; // 7–16 s
+      const tick = () => {
+        this._strikeBowl();
+        this._bowlTimer = setTimeout(tick, interval());
+      };
+      this._bowlTimer = setTimeout(tick, 2000 + Math.random() * 4000);
+    },
+
+    setNoise(v) {
       this._ensureCtx();
       this.noiseGain.gain.linearRampToValueAtTime(v * 0.35, this.ctx.currentTime + 0.1);
     },
-    setAmbient(v) {       // 0‒1
+    setAmbient(v) {
       this._ensureCtx();
-      this.ambientGain.gain.linearRampToValueAtTime(v * 0.3, this.ctx.currentTime + 0.1);
+      this._ambientLevel = v;
+      this.ambientGain.gain.linearRampToValueAtTime(v * 0.28, this.ctx.currentTime + 0.3);
     },
     resume() {
       if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
