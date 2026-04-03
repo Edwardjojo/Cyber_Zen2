@@ -386,6 +386,7 @@
   <a href="#s6">Step 6 · 背景亮度调优</a>
   <a href="#s7">Step 7 · UI 可见性优化</a>
   <a href="#s8">Step 8 · Zen Ambient 音频</a>
+  <a href="#s9">Step 9 · 四场景音频系统</a>
   <a href="#arch">架构总览</a>
 </nav>
 
@@ -1005,6 +1006,142 @@ partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
   </div>
 </section>
 
+<!-- ══ STEP 9 : AUDIO SCENES ══ -->
+<section class="section" id="s9">
+  <div class="step-header">
+    <span class="step-num">STEP 09</span>
+    <h2>四场景音频系统 · Scene-Aware Audio</h2>
+  </div>
+
+  <div class="chat">
+    <div class="bubble user">
+      <div class="bubble-label">Phoenix · 用户</div>
+      Rain 和 Star 两个模式的音频能不能不一样？Rain 给两个选项：自然雨声 / 窗边细雨；Star 也给两个：钢琴+合成器 / 深空氛围。另外白噪音小声一点
+    </div>
+    <div class="bubble ai">
+      <div class="bubble-label">GitHub Copilot</div>
+      好的，全面重写 Audio 模块：4 个独立合成函数 + Scene 选择器 UI，白噪音增益上限从 0.35 降至 0.08
+    </div>
+  </div>
+
+  <h3>// 四场景对照表</h3>
+  <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left;padding:8px 12px;color:var(--accent);">模式</th>
+        <th style="text-align:left;padding:8px 12px;color:var(--accent);">场景</th>
+        <th style="text-align:left;padding:8px 12px;color:var(--accent);">合成方法</th>
+        <th style="text-align:left;padding:8px 12px;color:var(--accent);">核心频率</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;">🌧️ Rain</td>
+        <td style="padding:8px 12px;">自然雨声</td>
+        <td style="padding:8px 12px;">粉噪声 × 低通滤波（400Hz）+ 随机水滴（4kHz 敲击）</td>
+        <td style="padding:8px 12px;">DC–400Hz + 4kHz</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;">🌧️ Rain</td>
+        <td style="padding:8px 12px;">窗边细雨</td>
+        <td style="padding:8px 12px;">粉噪声底层 + 随机玻璃水滴（高Q 峰值滤波 + 指数衰减）</td>
+        <td style="padding:8px 12px;">1k–3kHz 共振峰</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;">❄️ Star</td>
+        <td style="padding:8px 12px;">钢琴 + 合成器</td>
+        <td style="padding:8px 12px;">五声音阶随机琶音（OscillatorNode 正弦）+ 粉噪声垫底</td>
+        <td style="padding:8px 12px;">D 五声音阶</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;">❄️ Star</td>
+        <td style="padding:8px 12px;">深空氛围</td>
+        <td style="padding:8px 12px;">136.1Hz OM + 6Hz Theta 差拍 + 藏式颂钵（3泛音）+ 双延迟混响</td>
+        <td style="padding:8px 12px;">136.1Hz / 142.1Hz</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>// 场景生命周期</h3>
+
+<pre><span class="cmt">// 切换场景时先停止旧场景，再启动新场景</span>
+<span class="fn">_stopScene</span>() {
+  <span class="kw">this</span>._nodes.<span class="fn">forEach</span>(n => { <span class="kw">try</span> { n.<span class="fn">stop</span>(); } <span class="kw">catch</span>(e){} });
+  <span class="kw">this</span>._nodes = [];
+  <span class="fn">clearTimeout</span>(<span class="kw">this</span>._bowlTimer);
+  <span class="fn">clearTimeout</span>(<span class="kw">this</span>._dropTimer);
+},
+
+<span class="fn">_startScene</span>(mode, scene) {
+  <span class="kw">if</span> (mode === <span class="str">'rain'</span>) {
+    scene === <span class="num">0</span> ? <span class="kw">this</span>.<span class="fn">_sceneRainNatural</span>() : <span class="kw">this</span>.<span class="fn">_sceneRainWindow</span>();
+  } <span class="kw">else</span> {
+    scene === <span class="num">0</span> ? <span class="kw">this</span>.<span class="fn">_sceneStarPiano</span>() : <span class="kw">this</span>.<span class="fn">_sceneStarSpace</span>();
+  }
+}</pre>
+
+  <h3>// 窗边细雨 — 玻璃水滴调度器</h3>
+
+<pre><span class="cmt">// 随机玻璃水滴：高 Q 带通滤波 + 极短指数衰减，模拟雨滴敲击玻璃</span>
+<span class="kw">const</span> <span class="fn">schedDrop</span> = () => {
+  <span class="kw">const</span> buf = ctx.<span class="fn">createBuffer</span>(<span class="num">1</span>, ctx.sampleRate * <span class="num">0.05</span>, ctx.sampleRate);
+  <span class="cmt">/* 填充白噪声 */</span>
+  <span class="kw">const</span> src = ctx.<span class="fn">createBufferSource</span>();
+  src.buffer = buf;
+  <span class="kw">const</span> bpf = ctx.<span class="fn">createBiquadFilter</span>();
+  bpf.type = <span class="str">'bandpass'</span>;
+  bpf.frequency.value = <span class="num">800</span> + Math.<span class="fn">random</span>() * <span class="num">2200</span>;  <span class="cmt">// 800–3000Hz</span>
+  bpf.Q.value = <span class="num">18</span>;                                     <span class="cmt">// 高 Q = 尖锐水滴感</span>
+  <span class="kw">const</span> env = ctx.<span class="fn">createGain</span>();
+  env.gain.<span class="fn">setValueAtTime</span>(<span class="num">0.15</span>, now);
+  env.gain.<span class="fn">exponentialRampToValueAtTime</span>(<span class="num">0.0001</span>, now + <span class="num">0.18</span>);
+  src.<span class="fn">connect</span>(bpf).<span class="fn">connect</span>(env).<span class="fn">connect</span>(masterGain);
+  src.<span class="fn">start</span>(now);
+  <span class="kw">this</span>._dropTimer = <span class="fn">setTimeout</span>(schedDrop, <span class="num">200</span> + Math.<span class="fn">random</span>() * <span class="num">1800</span>);
+};</pre>
+
+  <h3>// 粉噪声合成</h3>
+
+<pre><span class="cmt">// _makePink() — 白噪声 → Voss-McCartney 粉化（7阶IIR近似）</span>
+<span class="kw">const</span> <span class="fn">_makePink</span> = (ctx, seconds = <span class="num">4</span>) => {
+  <span class="kw">const</span> sr = ctx.sampleRate, len = sr * seconds;
+  <span class="kw">const</span> buf = ctx.<span class="fn">createBuffer</span>(<span class="num">2</span>, len, sr);
+  <span class="kw">for</span> (<span class="kw">let</span> ch = <span class="num">0</span>; ch < <span class="num">2</span>; ch++) {
+    <span class="kw">const</span> d = buf.<span class="fn">getChannelData</span>(ch);
+    <span class="kw">let</span> b0=<span class="num">0</span>,b1=<span class="num">0</span>,b2=<span class="num">0</span>,b3=<span class="num">0</span>,b4=<span class="num">0</span>,b5=<span class="num">0</span>,b6=<span class="num">0</span>;
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i < len; i++) {
+      <span class="kw">const</span> w = Math.<span class="fn">random</span>() * <span class="num">2</span> - <span class="num">1</span>;
+      b0 = <span class="num">0.99886</span>*b0 + w*<span class="num">0.0555179</span>; b1 = <span class="num">0.99332</span>*b1 + w*<span class="num">0.0750759</span>;
+      b2 = <span class="num">0.96900</span>*b2 + w*<span class="num">0.1538520</span>; b3 = <span class="num">0.86650</span>*b3 + w*<span class="num">0.3104856</span>;
+      b4 = <span class="num">0.55000</span>*b4 + w*<span class="num">0.5329522</span>; b5 = <span class="num">-0.7616</span>*b5 - w*<span class="num">0.0168980</span>;
+      d[i] = (b0+b1+b2+b3+b4+b5+b6 + w*<span class="num">0.5362</span>) * <span class="num">0.11</span>;
+      b6 = w * <span class="num">0.115926</span>;
+    }
+  }
+  <span class="kw">return</span> buf;
+};</pre>
+
+  <div class="callout callout-warn">
+    <div class="callout-label">🔧 白噪音增益修复</div>
+    原来白噪音增益上限 <code>v * 0.35</code> 在滑杆低位时仍然偏响。修复：将乘数从 <strong>0.35 → 0.08</strong>，同时场景底层噪声独立控制，避免两路叠加后过响。
+  </div>
+
+  <h3>// Scene 选择器 UI</h3>
+  <p>在 Vibe Mixer 面板底部新增 <code>#scene-selector</code>，两枚 <code>.scene-btn</code> 动态更新标签：Rain 模式显示「自然雨声 / 窗边细雨」，Star 模式显示「钢琴+合成器 / 深空氛围」。切换模式时 <code>Audio.setMode(mode)</code> 同步刷新按钮文字和激活状态。</p>
+
+  <div class="screenshot">
+    <div class="screenshot-header">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="screenshot-url">localhost:8090 · Vibe Mixer · Scene 选择器</span>
+    </div>
+    <div class="screenshot-body">
+      <div class="screenshot-icon">🎵</div>
+      <div class="screenshot-hint">截图：Vibe Mixer 展开后底部新增 Scene 选择行，Rain 模式下显示「自然雨声」「窗边细雨」两个按钮，当前激活按钮高亮</div>
+    </div>
+    <div class="screenshot-caption">Fig 9 · 四场景音频选择器 UI</div>
+  </div>
+</section>
+
 <!-- ══ ARCHITECTURE ══ -->
 <section class="section" id="arch">
   <div class="step-header">
@@ -1031,11 +1168,18 @@ partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
   │            ├ noise → §3 Audio.setNoise()    │
   │            └ music → §3 Audio.setAmbient()  │
   │                                             │
-  │  §3 Audio Engine                            │
-  │    白噪音 Buffer ← noiseGain                │
-  │    颂钵 Partials ← ambientGain              │
-  │    双延迟混响 (1.8s + 2.7s)                 │
-  │    随机定时器 _scheduleBowl()               │
+  │  §3 Audio Engine  (4 Scenes)                │
+  │    _makePink() → stereo pink noise buf      │
+  │    ┌─ Rain ──────────────────────────────┐  │
+  │    │  scene 0: 粉噪声+低通+随机水滴      │  │
+  │    │  scene 1: 粉噪声+玻璃水滴调度器     │  │
+  │    └─────────────────────────────────────┘  │
+  │    ┌─ Star ──────────────────────────────┐  │
+  │    │  scene 0: 五声音阶随机琶音          │  │
+  │    │  scene 1: OM 136.1Hz+Theta+颂钵    │  │
+  │    └─────────────────────────────────────┘  │
+  │    _stopScene() / _startScene(mode,scene)   │
+  │    noiseGain ceiling: v*0.08 (↓ from 0.35) │
   │                                             │
   │  §4 Storage (LocalStorage)                  │
   │    text / font / mode / mixer / timer       │
@@ -1052,6 +1196,8 @@ partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
   │  §8 Mode Switcher                           │
   │    mousemove → top 50px → mode-bar visible │
   │    'rain'/'snow' → Canvas.setMode()         │
+  │                  → Audio.setMode()          │
+  │    #scene-selector → Audio.setScene(n)      │
   └─────────────────────────────────────────────┘
 </pre>
 
@@ -1064,6 +1210,9 @@ partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
     <span class="tag tag-purple">OscillatorNode</span>
     <span class="tag tag-purple">DelayNode</span>
     <span class="tag tag-purple">BiquadFilterNode</span>
+    <span class="tag tag-purple">BufferSourceNode</span>
+    <span class="tag tag-purple">Pink Noise Synthesis</span>
+    <span class="tag tag-purple">Binaural Beat</span>
     <span class="tag tag-green">CSS backdrop-filter</span>
     <span class="tag tag-green">CSS Custom Properties</span>
     <span class="tag tag-green">SVG stroke-dashoffset</span>
@@ -1085,7 +1234,7 @@ partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
       <div class="screenshot-icon">🌧️</div>
       <div class="screenshot-hint">截图：Rain 模式全貌 — 玻璃雨滴折射城市 bokeh 灯点，中央毛玻璃编辑器，底部 Vibe Mixer 控制台</div>
     </div>
-    <div class="screenshot-caption">Fig 9 · Rain Mode 完整效果</div>
+    <div class="screenshot-caption">Fig 10 · Rain Mode 完整效果</div>
   </div>
 
   <div class="screenshot">
@@ -1097,7 +1246,7 @@ partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
       <div class="screenshot-icon">❄️</div>
       <div class="screenshot-hint">截图：Star/Snow 模式全貌 — 多层视差雪花飘落，景深效果让远处雪花虚化，中央编辑器内容与字体设置与 Rain 模式保持一致</div>
     </div>
-    <div class="screenshot-caption">Fig 10 · Star Mode 完整效果</div>
+    <div class="screenshot-caption">Fig 11 · Star Mode 完整效果</div>
   </div>
 
   <div class="screenshot">
@@ -1109,7 +1258,7 @@ partials.<span class="fn">forEach</span>(({ f, vol, decay }) => {
       <div class="screenshot-icon">⏱️</div>
       <div class="screenshot-hint">截图：ZenTimer 倒计时界面 — SVG 环形进度条随时间消融，中央数字显示剩余时间，底部可选 15/25/45 分钟预设</div>
     </div>
-    <div class="screenshot-caption">Fig 11 · ZenTimer 极简环形计时器</div>
+    <div class="screenshot-caption">Fig 12 · ZenTimer 极简环形计时器</div>
   </div>
 
   <div class="divider"></div>

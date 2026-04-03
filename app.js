@@ -352,119 +352,329 @@
   const Audio = {
     ctx: null,
     noiseGain: null,
-    ambientGain: null,
-    noiseNode: null,
-    ambientOscs: [],
-    _bowlTimer: null,
+    _masterOut: null,   // master limiter/gain
+    _ambientBus: null,  // ambient scene bus → reverb → master
+    _reverbWet: null,   // reverb send gain
     _ambientLevel: 0,
+    _currentMode: 'rain',
+    _currentScene: 0,   // 0 = A track, 1 = B track
+    _sceneNodes: [],    // stoppable nodes for current scene
+    _schedTimers: [],   // setTimeout handles for current scene
 
+    // ── Bootstrap ──────────────────────────────────────────
     _ensureCtx() {
       if (this.ctx) return;
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this.ctx;
 
-      // --- White noise (rain texture) ---
-      const bufSize = this.ctx.sampleRate * 2;
-      const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
-      this.noiseNode = this.ctx.createBufferSource();
-      this.noiseNode.buffer = buf;
-      this.noiseNode.loop = true;
-      const bp = this.ctx.createBiquadFilter();
-      bp.type = 'bandpass'; bp.frequency.value = 800; bp.Q.value = 0.5;
-      this.noiseGain = this.ctx.createGain();
+      // Master output gain (headroom)
+      this._masterOut = ctx.createGain();
+      this._masterOut.gain.value = 0.85;
+      this._masterOut.connect(ctx.destination);
+
+      // ── White noise bus (always running, very quiet) ──
+      const nBuf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
+      const nd = nBuf.getChannelData(0);
+      for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      const nSrc = ctx.createBufferSource();
+      nSrc.buffer = nBuf; nSrc.loop = true;
+      const nHP = ctx.createBiquadFilter();
+      nHP.type = 'highpass'; nHP.frequency.value = 400;
+      this.noiseGain = ctx.createGain();
       this.noiseGain.gain.value = 0;
-      this.noiseNode.connect(bp).connect(this.noiseGain).connect(this.ctx.destination);
-      this.noiseNode.start();
+      nSrc.connect(nHP).connect(this.noiseGain).connect(this._masterOut);
+      nSrc.start();
 
-      // --- Zen ambient bus ---
-      this.ambientGain = this.ctx.createGain();
-      this.ambientGain.gain.value = 0;
+      // ── Ambient scene bus ──
+      this._ambientBus = ctx.createGain();
+      this._ambientBus.gain.value = 0;
 
-      // Long reverb tail: two delay lines with filtered feedback
-      const mkDelay = (time, fbAmt, cutoff) => {
-        const d  = this.ctx.createDelay(4.0);
-        const f  = this.ctx.createBiquadFilter();
-        const fg = this.ctx.createGain();
-        d.delayTime.value = time;
-        f.type = 'lowpass'; f.frequency.value = cutoff;
-        fg.gain.value = fbAmt;
-        d.connect(f).connect(fg).connect(d);       // feedback loop
-        this.ambientGain.connect(d);
-        fg.connect(this.ctx.destination);          // wet out
-      };
-      mkDelay(1.8,  0.45, 800);
-      mkDelay(2.7,  0.35, 500);
-
-      // Dry path through low-pass
-      const dryLP = this.ctx.createBiquadFilter();
-      dryLP.type = 'lowpass'; dryLP.frequency.value = 900;
-      this.ambientGain.connect(dryLP).connect(this.ctx.destination);
-
-      // Continuous breath-drone: 136.1 Hz (Earth-year resonance, "OM" frequency)
-      // + a theta-beat partner 6 Hz higher to induce meditative brainwave entrainment
-      [[136.1, 0.028], [142.1, 0.018]].forEach(([f, vol]) => {
-        const osc = this.ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = f;
-        // micro-drift LFO (0.04 Hz, ±0.15%)
-        const lfo = this.ctx.createOscillator();
-        lfo.type = 'sine'; lfo.frequency.value = 0.04;
-        const lg = this.ctx.createGain(); lg.gain.value = f * 0.0015;
-        lfo.connect(lg).connect(osc.frequency); lfo.start();
-        const g = this.ctx.createGain(); g.gain.value = vol;
-        osc.connect(g).connect(this.ambientGain);
-        osc.start();
-        this.ambientOscs.push(osc);
+      // Shared reverb: Schroeder-lite (two comb-like delay lines)
+      this._reverbWet = ctx.createGain();
+      this._reverbWet.gain.value = 0.38;
+      [[2.1, 0.42, 700], [3.3, 0.32, 500]].forEach(([t, fb, co]) => {
+        const d = ctx.createDelay(5.0); d.delayTime.value = t;
+        const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = co;
+        const g = ctx.createGain(); g.gain.value = fb;
+        d.connect(f).connect(g).connect(d);
+        this._ambientBus.connect(d);
+        g.connect(this._reverbWet);
       });
+      this._reverbWet.connect(this._masterOut);
 
-      // Schedule periodic singing-bowl strikes
-      this._scheduleBowl();
+      // Dry path
+      const dryLP = ctx.createBiquadFilter();
+      dryLP.type = 'lowpass'; dryLP.frequency.value = 8000;
+      this._ambientBus.connect(dryLP).connect(this._masterOut);
     },
 
-    // Tibetan singing bowl simulation
-    // Real bowls: strong fundamental + overtone at ~2.76× + 5.2× the fundamental
-    _strikeBowl() {
-      if (!this.ctx || this._ambientLevel < 0.01) return;
-      const now  = this.ctx.currentTime;
-      const root = 222.0;   // ~A3-ish, warm bowl pitch
-      const partials = [
-        { f: root,        vol: 0.18, decay: 6.0  },
-        { f: root * 2.76, vol: 0.07, decay: 4.0  },
-        { f: root * 5.20, vol: 0.025, decay: 2.5 },
-      ];
-      partials.forEach(({ f, vol, decay }) => {
-        const osc = this.ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = f;
-        const env = this.ctx.createGain();
+    // ── Scene lifecycle ────────────────────────────────────
+    _stopScene() {
+      this._schedTimers.forEach(clearTimeout);
+      this._schedTimers = [];
+      const t = this.ctx ? this.ctx.currentTime : 0;
+      this._sceneNodes.forEach(n => {
+        try {
+          if (n.gain) {
+            n.gain.cancelScheduledValues(t);
+            n.gain.setTargetAtTime(0, t, 0.4);    // 400ms fade-out
+          } else if (n.stop) {
+            n.stop(t + 0.5);
+          }
+        } catch (_) {}
+      });
+      this._sceneNodes = [];
+    },
+
+    _startScene(mode, scene) {
+      this._ensureCtx();
+      this._stopScene();
+      if (this._ambientLevel < 0.01) return;
+      const fn = {
+        rain0: '_sceneRainNatural',
+        rain1: '_sceneRainWindow',
+        snow0: '_sceneStarPiano',
+        snow1: '_sceneStarSpace',
+      }[`${mode}${scene}`];
+      if (fn) this[fn]();
+    },
+
+    // helper: register a node for cleanup
+    _reg(node)  { this._sceneNodes.push(node); return node; },
+    _sched(fn, ms) { this._schedTimers.push(setTimeout(fn, ms)); },
+
+    // helper: pink noise buffer (stereo, 4s)
+    _makePink(dur = 4) {
+      const ctx = this.ctx;
+      const buf = ctx.createBuffer(2, ctx.sampleRate * dur, ctx.sampleRate);
+      for (let c = 0; c < 2; c++) {
+        let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0;
+        const d = buf.getChannelData(c);
+        for (let i = 0; i < d.length; i++) {
+          const w = Math.random() * 2 - 1;
+          b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
+          b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
+          b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
+          d[i] = (b0+b1+b2+b3+b4+b5+w*0.5362) * 0.11;
+        }
+      }
+      return buf;
+    },
+
+    // ─────────────────────────────────────────────────────
+    // RAIN A │ 自然雨声 — 连绵粉红噪声，三频段叠加
+    // ─────────────────────────────────────────────────────
+    _sceneRainNatural() {
+      const ctx = this.ctx;
+      const buf = this._makePink(6);
+      const vol = this._ambientLevel;
+
+      // Low rumble (thunder distance)
+      const src1 = ctx.createBufferSource(); src1.buffer = buf; src1.loop = true;
+      const lp1  = ctx.createBiquadFilter(); lp1.type = 'lowpass';  lp1.frequency.value = 180;
+      const g1   = ctx.createGain(); g1.gain.value = vol * 0.25;
+      src1.connect(lp1).connect(g1).connect(this._ambientBus);
+      src1.start(); this._reg(g1); this._reg(src1);
+
+      // Main rain body
+      const src2 = ctx.createBufferSource(); src2.buffer = buf; src2.loop = true; src2.loopStart = 0.5;
+      const bp2  = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 900; bp2.Q.value = 0.6;
+      const g2   = ctx.createGain(); g2.gain.value = vol * 0.7;
+      src2.connect(bp2).connect(g2).connect(this._ambientBus);
+      src2.start(); this._reg(g2); this._reg(src2);
+
+      // High shimmer
+      const src3 = ctx.createBufferSource(); src3.buffer = buf; src3.loop = true; src3.loopStart = 1.2;
+      const hp3  = ctx.createBiquadFilter(); hp3.type = 'highpass'; hp3.frequency.value = 3500;
+      const g3   = ctx.createGain(); g3.gain.value = vol * 0.18;
+      src3.connect(hp3).connect(g3).connect(this._ambientBus);
+      src3.start(); this._reg(g3); this._reg(src3);
+
+      // Slow swell LFO (wind variation)
+      const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.04;
+      const lg  = ctx.createGain(); lg.gain.value = vol * 0.08;
+      lfo.connect(lg).connect(g2.gain);
+      lfo.start(); this._reg(lfo);
+    },
+
+    // ─────────────────────────────────────────────────────
+    // RAIN B │ 窗边细雨 — 随机水滴 + 细沙沙背景
+    // ─────────────────────────────────────────────────────
+    _sceneRainWindow() {
+      const ctx = this.ctx;
+      const buf = this._makePink(4);
+      const vol = this._ambientLevel;
+
+      // Very quiet sizzle background
+      const bgSrc = ctx.createBufferSource(); bgSrc.buffer = buf; bgSrc.loop = true;
+      const bgBP  = ctx.createBiquadFilter(); bgBP.type = 'bandpass'; bgBP.frequency.value = 2400; bgBP.Q.value = 1.2;
+      const bgG   = ctx.createGain(); bgG.gain.value = vol * 0.2;
+      bgSrc.connect(bgBP).connect(bgG).connect(this._ambientBus);
+      bgSrc.start(); this._reg(bgG); this._reg(bgSrc);
+
+      // Sparse droplet scheduler
+      const drop = () => {
+        if (this._ambientLevel < 0.01) return;
+        const now = ctx.currentTime;
+        // each drop = short noise burst through narrow BP
+        const dropBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.06), ctx.sampleRate);
+        const dd = dropBuf.getChannelData(0);
+        for (let i = 0; i < dd.length; i++) dd[i] = Math.random() * 2 - 1;
+        const dSrc = ctx.createBufferSource(); dSrc.buffer = dropBuf;
+        const dBP  = ctx.createBiquadFilter(); dBP.type = 'bandpass';
+        dBP.frequency.value = 800 + Math.random() * 1600; dBP.Q.value = 4;
+        const dEnv = ctx.createGain();
+        dEnv.gain.setValueAtTime(0, now);
+        dEnv.gain.linearRampToValueAtTime(vol * (0.3 + Math.random() * 0.5), now + 0.003);
+        dEnv.gain.exponentialRampToValueAtTime(0.0001, now + 0.05 + Math.random() * 0.08);
+        dSrc.connect(dBP).connect(dEnv).connect(this._ambientBus);
+        dSrc.start(now);
+        // schedule next drop
+        const next = 80 + Math.random() * 300;
+        this._sched(drop, next);
+      };
+      this._sched(drop, 50);
+    },
+
+    // ─────────────────────────────────────────────────────
+    // STAR A │ 钢琴+合成器 — 五声音阶随机琴音 + 柔光垫音
+    // ─────────────────────────────────────────────────────
+    _sceneStarPiano() {
+      const ctx   = this.ctx;
+      const vol   = this._ambientLevel;
+      // C pentatonic: C4, D4, E4, G4, A4, C5, D5
+      const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33];
+
+      // Pad drone (slow attack, always-on)
+      [[130.81, 0.022], [196.00, 0.016], [261.63, 0.012]].forEach(([f, v]) => {
+        const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = f;
+        // slow breath LFO
+        const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.06 + Math.random() * 0.04;
+        const lg  = ctx.createGain(); lg.gain.value = v * 0.25;
+        const g   = ctx.createGain(); g.gain.value = vol * v;
+        lfo.connect(lg).connect(osc.frequency);
+        osc.connect(g).connect(this._ambientBus);
+        osc.start(); lfo.start();
+        this._reg(g); this._reg(osc); this._reg(lfo);
+      });
+
+      // Random piano notes
+      const note = () => {
+        if (this._ambientLevel < 0.01) return;
+        const now = ctx.currentTime;
+        const f   = notes[Math.floor(Math.random() * notes.length)];
+        // sine + soft triangle blend = piano-ish tone
+        [[1.0, 'sine', 0.6], [2.0, 'triangle', 0.2], [3.0, 'sine', 0.08]].forEach(([mult, type, w]) => {
+          const o   = ctx.createOscillator(); o.type = type; o.frequency.value = f * mult;
+          const env = ctx.createGain();
+          const pk  = vol * w * (0.7 + Math.random() * 0.3);
+          env.gain.setValueAtTime(0, now);
+          env.gain.linearRampToValueAtTime(pk, now + 0.015);
+          env.gain.exponentialRampToValueAtTime(0.0001, now + 1.8 + Math.random() * 2.5);
+          o.connect(env).connect(this._ambientBus);
+          o.start(now); o.stop(now + 4.5);
+        });
+        const next = 1800 + Math.random() * 4000;
+        this._sched(note, next);
+      };
+      this._sched(note, 600 + Math.random() * 1000);
+    },
+
+    // ─────────────────────────────────────────────────────
+    // STAR B │ 深空星际 — 水晶音色 + 星光闪烁 + 缥缈底音
+    // ─────────────────────────────────────────────────────
+    _sceneStarSpace() {
+      const ctx = this.ctx;
+      const vol = this._ambientLevel;
+
+      // Deep sub drone (55Hz + 82.5Hz) — theta binaural pair
+      [[55.00, 0.030], [61.00, 0.018], [82.50, 0.020]].forEach(([f, v]) => {
+        const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = f;
+        const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.03;
+        const lg  = ctx.createGain(); lg.gain.value = f * 0.001;
+        const g   = ctx.createGain(); g.gain.value = vol * v;
+        lfo.connect(lg).connect(osc.frequency);
+        osc.connect(g).connect(this._ambientBus);
+        osc.start(); lfo.start();
+        this._reg(g); this._reg(osc); this._reg(lfo);
+      });
+
+      // Crystal shimmer — narrow high bandpass noise strata
+      const buf = this._makePink(3);
+      [4200, 6800].forEach((freq, i) => {
+        const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = i * 0.7;
+        const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 3;
+        const g = ctx.createGain(); g.gain.value = vol * 0.07;
+        s.connect(f).connect(g).connect(this._ambientBus);
+        s.start(); this._reg(g); this._reg(s);
+      });
+
+      // Sparse star-light chimes (FM bell)
+      const chime = () => {
+        if (this._ambientLevel < 0.01) return;
+        const now  = ctx.currentTime;
+        const base = [523.25, 659.25, 783.99, 1046.5][Math.floor(Math.random() * 4)];
+        const mod  = ctx.createOscillator(); mod.frequency.value = base * 2.756;
+        const modG = ctx.createGain(); modG.gain.value = base * 1.8;
+        const car  = ctx.createOscillator(); car.frequency.value = base;
+        const env  = ctx.createGain();
         env.gain.setValueAtTime(0, now);
-        env.gain.linearRampToValueAtTime(vol * this._ambientLevel, now + 0.012);
-        env.gain.exponentialRampToValueAtTime(0.0001, now + decay);
-        osc.connect(env).connect(this.ambientGain);
-        osc.start(now);
-        osc.stop(now + decay + 0.1);
-      });
+        env.gain.linearRampToValueAtTime(vol * 0.18, now + 0.008);
+        env.gain.exponentialRampToValueAtTime(0.0001, now + 3.5 + Math.random() * 2);
+        mod.connect(modG).connect(car.frequency);
+        car.connect(env).connect(this._ambientBus);
+        mod.start(now); car.start(now);
+        mod.stop(now + 6); car.stop(now + 6);
+        const next = 2500 + Math.random() * 6000;
+        this._sched(chime, next);
+      };
+      this._sched(chime, 1000 + Math.random() * 1500);
     },
 
-    _scheduleBowl() {
-      const interval = () => 7000 + Math.random() * 9000; // 7–16 s
-      const tick = () => {
-        this._strikeBowl();
-        this._bowlTimer = setTimeout(tick, interval());
+    // ── Public API ─────────────────────────────────────────
+    setMode(mode) {
+      this._currentMode = mode;
+      // update scene button labels
+      const labels = {
+        rain: ['自然雨声', '窗边细雨'],
+        snow: ['星空钢琴', '深空星际'],
       };
-      this._bowlTimer = setTimeout(tick, 2000 + Math.random() * 4000);
+      document.querySelectorAll('.scene-btn').forEach((btn, i) => {
+        btn.textContent = labels[mode][i];
+      });
+      if (this.ctx && this._ambientLevel > 0.01) {
+        this._startScene(mode, this._currentScene);
+      }
+    },
+
+    setScene(scene) {
+      this._currentScene = scene;
+      document.querySelectorAll('.scene-btn').forEach(b => {
+        b.classList.toggle('active', +b.dataset.scene === scene);
+      });
+      if (this.ctx && this._ambientLevel > 0.01) {
+        this._startScene(this._currentMode, scene);
+      }
     },
 
     setNoise(v) {
       this._ensureCtx();
-      this.noiseGain.gain.linearRampToValueAtTime(v * 0.35, this.ctx.currentTime + 0.1);
+      // significantly lower ceiling — white noise as subtle texture only
+      this.noiseGain.gain.linearRampToValueAtTime(v * 0.08, this.ctx.currentTime + 0.15);
     },
+
     setAmbient(v) {
       this._ensureCtx();
+      const wasOff = this._ambientLevel < 0.01;
       this._ambientLevel = v;
-      this.ambientGain.gain.linearRampToValueAtTime(v * 0.28, this.ctx.currentTime + 0.3);
+      this._ambientBus.gain.linearRampToValueAtTime(v * 0.32, this.ctx.currentTime + 0.4);
+      if (wasOff && v > 0.01) {
+        this._startScene(this._currentMode, this._currentScene);
+      } else if (v < 0.01) {
+        this._stopScene();
+      }
     },
+
     resume() {
       if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
     },
@@ -586,6 +796,11 @@
       });
       wire('sl-noise', 'noise', v => Audio.setNoise(v));
       wire('sl-music', 'music', v => Audio.setAmbient(v));
+
+      // Scene selector
+      document.querySelectorAll('.scene-btn').forEach(btn => {
+        btn.addEventListener('click', () => Audio.setScene(+btn.dataset.scene));
+      });
     },
 
     toggle(force) {
@@ -721,6 +936,7 @@
         el.classList.toggle('active', el.dataset.mode === mode);
       });
       Canvas.setMode(mode);
+      Audio.setMode(mode);
       Storage.save(Storage.KEY_MODE, mode);
     },
   };

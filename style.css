@@ -349,6 +349,47 @@ input[type="range"]::-moz-range-thumb {
 .font-serif   { font-family: var(--font-2) !important; }
 .font-mono    { font-family: var(--font-3) !important; }
 
+/* ---- Scene Selector ---- */
+#scene-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+#scene-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.scene-btn {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: rgba(180,195,225,0.5);
+  font-family: var(--font-1);
+  font-size: 12px;
+  padding: 8px 6px;
+  cursor: pointer;
+  transition: all 0.25s;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+.scene-btn:hover {
+  color: rgba(210,225,245,0.85);
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.18);
+}
+.scene-btn.active {
+  color: var(--accent);
+  background: rgba(100,180,255,0.1);
+  border-color: rgba(100,180,255,0.3);
+  box-shadow: 0 0 10px rgba(100,180,255,0.12);
+}
+
 /* ---- Misc ---- */
 ::selection {
   background: rgba(100, 180, 255, 0.25);
